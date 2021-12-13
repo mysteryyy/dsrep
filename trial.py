@@ -18,7 +18,6 @@ from matplotlib import rcParams
 import numpy as np
 import seaborn as sns
 os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/Protocol")
-import csv
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -127,6 +126,8 @@ data = load_subjects()# Add your own location for the data here to replicate the
 data = data.drop(data[data['activity_id']==0].index)# Removing rows with activity id of 0
 act = gen_activity_names()
 data['activity_name'] = data.activity_id.apply(lambda x:act[x])
+data = data.drop([i for i in data.columns if 'orientation' in i],axis=1)# Dropping Orientation 
+# columns
 display(data.head())
 
 # **Note**: The procedure to replace missing values using the feature mean is performed
@@ -137,10 +138,9 @@ display(data.head())
 
 def clean_data(data): # Function for extracting clean data
     #data = data.interpolate()
-    # fill all the NaN values in a coulmn with the mean values of the column
+    # fill all the NaN values in a column with the mean values of the column
     for colName in data.columns:
         data[colName] = data[colName].fillna(data[colName].mean())
-    activity_mean = data.groupby(['activity_id']).mean().reset_index()
     return data
 
 
@@ -219,10 +219,18 @@ plt.show()
 
 # ### Decriptive Statistics
 # Mean of heart rate and temperatures for each activity
-
 display(train.groupby(by='activity_name')[['heart_rate','chest_temperature','hand_temperature',
     'ankle_temperature']].mean())
-discard = ['activity_id','activity','time_stamp']# Columns to exclude from descriptove statistics
+discard = ['activity_id','activity','time_stamp','id']# Columns to exclude from descriptive statistics
+# Creating table with only relevant columns
+train_trimmed = train[[i for i in train.columns if i not in discard]]
 
-# Descriptive info only for columns choosen
-display(train[[i for i in train.columns if i not in discard]].describe()) 
+
+# Descriptive info of relevant feature
+
+display(train_trimmed.describe())
+
+# Correlation table of relevant feature
+
+
+display(train_trimmed.corr()) 
