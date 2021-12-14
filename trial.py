@@ -148,7 +148,7 @@ def clean_data(data): # Function for extracting clean data
 # After labeling the data appropriately, it is randomly split into training and testing sets. 
 # In the training set, we perform Exploratory Data Analysis and come up with potential hypotheses. 
 # We then test those hypotheses on the testing set.
-# 60% of data is used for training in this case(Exploratory data analysis) and the rest for testing
+# 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing
 
 def train_test_split(data,split_size):
     np.random.seed(5)
@@ -156,7 +156,7 @@ def train_test_split(data,split_size):
     train = data[msk] # Generating training data
     test = data[~msk] # generating testing data  
     return train,test
-train,test = train_test_split(data,0.55)
+train,test = train_test_split(data,0.50)
 
 # ### Data Visualizations
 
@@ -222,15 +222,14 @@ plt.show()
 display(train.groupby(by='activity_name')[['heart_rate','chest_temperature','hand_temperature',
     'ankle_temperature']].mean())
 discard = ['activity_id','activity','time_stamp','id']# Columns to exclude from descriptive statistics
+
 # Creating table with only relevant columns
 train_trimmed = train[[i for i in train.columns if i not in discard]]
-
 
 # Descriptive info of relevant feature
 
 display(train_trimmed.describe())
 
 # Correlation table of relevant feature
-
 
 display(train_trimmed.corr()) 
