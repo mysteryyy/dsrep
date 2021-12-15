@@ -245,8 +245,8 @@ display(train_trimmed.corr())
 # $H_0$(Null) : The hand temperature while ironing and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The hand temperature while ironing is likely to be higher compared to other activities.
 
-test1 = test[test.activity_name=='ironing'].hand_temperature # Hand temperature while ironing
-test2 = test[test.activity_name!='ironing'].hand_temperature # hand temperature while not ironing
+test1 = test[test.activity_name=='ironing'].hand_temperature.dropna()# Hand temperature while ironing
+test2 = test[test.activity_name!='ironing'].hand_temperature.dropna()# hand temperature while not ironing.Nan values dropped to get the actual size of samples.
 print(ranksums(test1,test2,alternative='greater'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
@@ -255,8 +255,8 @@ print(ranksums(test1,test2,alternative='greater'))
 # $H_0$(Null) : The hand temperature while 'vacuum_cleaning' and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The hand temperature while 'vacuum_cleaning' is likely to be higher compared to other activities.
 
-test1 = test[test.activity_name=='vacuum_cleaning'].hand_temperature
-test2 = test[test.activity_name!='vacuum_cleaning'].hand_temperature
+test1 = test[test.activity_name=='vacuum_cleaning'].hand_temperature.dropna()
+test2 = test[test.activity_name!='vacuum_cleaning'].hand_temperature.dropna()
 print(ranksums(test1,test2,alternative='greater'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
@@ -265,8 +265,10 @@ print(ranksums(test1,test2,alternative='greater'))
 # $H_0$(Null) : The ankle temperature while lying and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The ankle temperature while lying is likely to be lower compared to other activities.
 
-test1 = test[test.activity_name=='lying'].ankle_temperature
-test2 = test[test.activity_name!='lying'].ankle_temperature
+test1 = test[test.activity_name=='lying'].ankle_temperature.dropna()
+
+test2 = test[test.activity_name!='lying'].ankle_temperature.dropna()
+
 print(ranksums(test1,test2,alternative='less'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
@@ -275,8 +277,10 @@ print(ranksums(test1,test2,alternative='less'))
 # $H_0$(Null) : The chest temperature while lying and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
 
-test1 = test[test.activity_name=='lying'].chest_temperature 
-test2 = test[test.activity_name!='lying'].chest_temperature
+test1 = test[test.activity_name=='lying'].chest_temperature.dropna()
+ 
+test2 = test[test.activity_name!='lying'].chest_temperature.dropna()
+
 print(ranksums(test1,test2,alternative='less'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
