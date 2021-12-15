@@ -106,7 +106,7 @@ def load_subjects(root='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject'):
     output = pd.DataFrame()
     cols = load_IMU()
     
-    for i in range(101,110,2):
+    for i in range(101,110,1):
         path = root + str(i) +'.dat'
         subject = pd.read_table(path, header=None, sep='\s+')
         subject.columns = cols 
