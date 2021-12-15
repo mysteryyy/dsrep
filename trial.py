@@ -3,14 +3,6 @@
 # ## **Introduction**
 # The PAMAP2 Physical Activity Monitoring dataset (available here) contains data from 9 participants who participated in 18 various physical activities (such as walking, cycling, and soccer) while wearing three inertial measurement units (IMUs) and a heart rate monitor. This information is saved in separate text files for each subject. The goal is to build hardware and/or software that can determine the amount and type of physical activity performed by an individual by using insights derived from analysing the given dataset. 
 
-# %%HTML
-# <style type="text/css">
-# table.dataframe td, table.dataframe th {
-#     border: 1px  black solid !important;
-#   color: black !important;
-# }
-# </style>
-
 
 import os
 from IPython.display import display
@@ -133,7 +125,7 @@ display(data.head())
 
 # **Note**: The procedure to replace missing values using the feature mean is performed
 # after hypothesis testing and EDA as filling up the missing values would lead to us getting
-# incorrect sample sizes for hypotheses testing.For Hypotheses testing the blank rows of an 
+# incorrect sample sizes for hypotheses testing. For Hypotheses testing the blank rows of an 
 # attribute will simply be ignored.
 
 
@@ -146,7 +138,7 @@ def clean_data(data): # Function for extracting clean data
 
 
 # ## Exploratory Data Analysis
-# After labeling the data appropriately, it is randomly split into training and testing sets. 
+# After labelling the data appropriately, it is randomly split into training and testing sets. 
 # In the training set, we perform Exploratory Data Analysis and come up with potential hypotheses. 
 # We then test those hypotheses on the testing set.
 # 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing
@@ -179,8 +171,8 @@ ax=sns.boxplot(x="activity_name",y="hand_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-# 1. "Ironing" and "vacuum_cleaning" may have higher average hand temperatures compared to other activitiies
-# 2. "Lying" and "standing" have outliers on the upper side while "ascending_stairs" has it on the lower side
+# 1. "Ironing" and "vacuum_cleaning" may have higher average hand temperatures compared to other activitiies.
+# 2. "Lying" and "standing" have outliers on the upper side while "ascending_stairs" has it on the lower side.
 
 # * Boxplot of ankle temperature grouped by activity
 
@@ -188,16 +180,16 @@ ax=sns.boxplot(x="activity_name",y="ankle_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Interestingly, we see that ankle_temperature might be lower on average while lying.
+# 1. Interestingly, we see that "ankle_temperature" might be lower on average while lying.
 # 2. Outliers are mostly present in "rope_jumping" and "vacuum_cleaning" on the lower side. 
 
-# * Boxplot of chest temperature grouped by activity
+# * Boxplot of chest temperature grouped by activity.
 
 ax=sns.boxplot(x="activity_name",y="chest_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Just like ankle temperature,the mean of chest temperature seems to be lower while lying  
+# 1. Just like ankle temperature, the mean of chest temperature seems to be lower while lying  
 #    and even "running" seems to have lower average, although the data is more widely distributed and positively skewed.
 # 2. The outliers are only present in "lying" and they are on the higher side.
 
@@ -216,7 +208,7 @@ plt.show()
 # 1. From the scatter plot, we see that there does not seem to be a correlation between
 #    the two variables.
 # 2. The respective histograms indicate that both the features considered have 
-#    a multi-modal distribution
+#    a multi-modal distribution.
 
 
 # ### Decriptive Statistics
@@ -238,23 +230,23 @@ display(train_trimmed.corr())
 
 # ## Hypothesis Testing  
 
-# Based on the exploratory data analysis carried out, the folloeing hypotheses are tested on  
+# Based on the exploratory data analysis carried out, the following hypotheses are tested on  
 # the test set:
-# - Hand temperature is higher during 'ironing' and 'vaccum_cleaning' compared
+# - Hand temperature is higher during 'ironing' and 'vacuum_cleaning' compared
 #   to other activities.
 # - Ankle temperature is lower than other activities while lying.
 # - Chest temperature is lower while lying compared to other activities. 
 
 
 # Based on the EDA  we performed, it does not seem that the data is normally distributed. It is 
-# for this reason that Wilcoxon rank sum test was used to test the above hypothesis instead of the usual t-test whcih assumes that the samples follow a normal distribution.
+# for this reason that Wilcoxon rank sum test was used to test the above hypothesis instead of the usual t-test which assumes that the samples follow a normal distribution.
 # We test the above hypothesis using the confidence level of 5%.
 
 # $H_0$(Null) : The hand temperature while ironing and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The hand temperature while ironing is likely to be higher compared to other activities.
 
-test1 = test[test.activity_name=='ironing'].hand_temperature
-test2 = test[test.activity_name!='ironing'].hand_temperature
+test1 = test[test.activity_name=='ironing'].hand_temperature # Hand temperature while ironing
+test2 = test[test.activity_name!='ironing'].hand_temperature # hand temperature while not ironing
 print(ranksums(test1,test2,alternative='greater'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
@@ -283,7 +275,7 @@ print(ranksums(test1,test2,alternative='less'))
 # $H_0$(Null) : The chest temperature while lying and while doing other activities are not significantly  different.
 # $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
 
-test1 = test[test.activity_name=='lying'].chest_temperature
+test1 = test[test.activity_name=='lying'].chest_temperature 
 test2 = test[test.activity_name!='lying'].chest_temperature
 print(ranksums(test1,test2,alternative='less'))
 
