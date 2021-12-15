@@ -15,6 +15,7 @@
 import os
 from IPython.display import display
 from matplotlib import rcParams
+from scipy.stats import ranksums
 import numpy as np
 import seaborn as sns
 os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/Protocol")
@@ -187,7 +188,7 @@ ax=sns.boxplot(x="activity_name",y="ankle_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Interestly, we see that ankle_temperature might be lower on average while lying.
+# 1. Interestingly, we see that ankle_temperature might be lower on average while lying.
 # 2. Outliers are mostly present in "rope_jumping" and "vacuum_cleaning" on the lower side. 
 
 # * Boxplot of chest temperature grouped by activity
@@ -196,8 +197,8 @@ ax=sns.boxplot(x="activity_name",y="chest_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Just like ankle temperature,the mean of chest temperature seems to be lower while lying and 
-#    even "running" seems to have lower average although the data is more widely distributed.
+# 1. Just like ankle temperature,the mean of chest temperature seems to be lower while lying  
+#    and even "running" seems to have lower average, although the data is more widely distributed and positively skewed.
 # 2. The outliers are only present in "lying" and they are on the higher side.
 
 # * A joint plot trying to investigate possibility of correlation between heart rate 
@@ -217,6 +218,7 @@ plt.show()
 # 2. The respective histograms indicate that both the features considered have 
 #    a multi-modal distribution
 
+
 # ### Decriptive Statistics
 # Mean of heart rate and temperatures for each activity
 display(train.groupby(by='activity_name')[['heart_rate','chest_temperature','hand_temperature',
@@ -230,6 +232,62 @@ train_trimmed = train[[i for i in train.columns if i not in discard]]
 
 display(train_trimmed.describe())
 
-# Correlation table of relevant feature
+# Correlation table of relevant features
 
 display(train_trimmed.corr()) 
+
+# ## Hypothesis Testing  
+
+# Based on the exploratory data analysis carried out, the folloeing hypotheses are tested on  
+# the test set:
+# - Hand temperature is higher during 'ironing' and 'vaccum_cleaning' compared
+#   to other activities.
+# - Ankle temperature is lower than other activities while lying.
+# - Chest temperature is lower while lying compared to other activities. 
+
+
+# Based on the EDA  we performed, it does not seem that the data is normally distributed. It is 
+# for this reason that Wilcoxon rank sum test was used to test the above hypothesis instead of the usual t-test whcih assumes that the samples follow a normal distribution.
+# We test the above hypothesis using the confidence level of 5%.
+
+# $H_0$(Null) : The hand temperature while ironing and while doing other activities are not significantly  different.
+# $H_1$(Alternate) : The hand temperature while ironing is likely to be higher compared to other activities.
+
+test1 = test[test.activity_name=='ironing'].hand_temperature
+test2 = test[test.activity_name!='ironing'].hand_temperature
+print(ranksums(test1,test2,alternative='greater'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
+
+# $H_0$(Null) : The hand temperature while 'vacuum_cleaning' and while doing other activities are not significantly  different.
+# $H_1$(Alternate) : The hand temperature while 'vacuum_cleaning' is likely to be higher compared to other activities.
+
+test1 = test[test.activity_name=='vacuum_cleaning'].hand_temperature
+test2 = test[test.activity_name!='vacuum_cleaning'].hand_temperature
+print(ranksums(test1,test2,alternative='greater'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
+
+# $H_0$(Null) : The ankle temperature while lying and while doing other activities are not significantly  different.
+# $H_1$(Alternate) : The ankle temperature while lying is likely to be lower compared to other activities.
+
+test1 = test[test.activity_name=='lying'].ankle_temperature
+test2 = test[test.activity_name!='lying'].ankle_temperature
+print(ranksums(test1,test2,alternative='less'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
+
+# $H_0$(Null) : The chest temperature while lying and while doing other activities are not significantly  different.
+# $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
+
+test1 = test[test.activity_name=='lying'].chest_temperature
+test2 = test[test.activity_name!='lying'].chest_temperature
+print(ranksums(test1,test2,alternative='less'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
+
+
