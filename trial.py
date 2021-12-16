@@ -5,6 +5,7 @@
 
 
 import os
+import pdb
 from IPython.display import display
 from matplotlib import rcParams
 from scipy.stats import ranksums
@@ -102,17 +103,31 @@ def load_IMU():
     ankle = generate_cols_IMU(ankle)
     output.extend(ankle)
     return output
-def load_subjects(root='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject'):
-    output = pd.DataFrame()
+
+def load_subjects(root1='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject',
+        root2 ='/home/sahil/Downloads/PAMAP2_Dataset/Optional/subject' ):
     cols = load_IMU()
-    
-    for i in range(101,110,1):
-        path = root + str(i) +'.dat'
-        subject = pd.read_table(path, header=None, sep='\s+')
-        subject.columns = cols 
+    output = pd.DataFrame()
+    for i in range(101,110):
+        path1 = root1 + str(i) + '.dat'
+        path2 = root2 + str(i) + '.dat'
+        subject= pd.DataFrame()
+         
+        try: # exception handling in casethe file  doesnt exist
+         subject_prot = pd.read_table(path1, header=None, sep='\s+') # subject data from 
+         # protocol activities
+         subject_opt = pd.read_table(path2, header=None, sep='\s+') # subject data from 
+         # optional activities
+         subject = subject.append(subject_prot)
+         subject = subject.append(subject_opt)
+         subject.columns = cols 
+         subject = subject.sort_values(by='time_stamp') # Arranging all measurements according to
+         # time
+
+        except Exception as e:
+         continue   # Continue to next iteration if file doesn't exist
         subject['id'] = i
         output = output.append(subject, ignore_index=True)
-    output.reset_index(drop=True, inplace=True)
     return output
 data = load_subjects()# Add your own location for the data here to replicate the code
 # for eg data = load_subjects('filepath')
@@ -266,9 +281,7 @@ print(ranksums(test1,test2,alternative='greater'))
 # $H_1$(Alternate) : The ankle temperature while lying is likely to be lower compared to other activities.
 
 test1 = test[test.activity_name=='lying'].ankle_temperature.dropna()
-
 test2 = test[test.activity_name!='lying'].ankle_temperature.dropna()
-
 print(ranksums(test1,test2,alternative='less'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
@@ -278,12 +291,11 @@ print(ranksums(test1,test2,alternative='less'))
 # $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
 
 test1 = test[test.activity_name=='lying'].chest_temperature.dropna()
- 
 test2 = test[test.activity_name!='lying'].chest_temperature.dropna()
-
 print(ranksums(test1,test2,alternative='less'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
+
 
 
