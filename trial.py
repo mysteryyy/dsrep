@@ -113,19 +113,20 @@ def load_subjects(root1='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject',
         path2 = root2 + str(i) + '.dat'
         subject= pd.DataFrame()
          
-        try: # exception handling in casethe file  doesnt exist
-         subject_prot = pd.read_table(path1, header=None, sep='\s+') # subject data from 
+        subject_prot = pd.read_table(path1, header=None, sep='\s+') # subject data from 
          # protocol activities
-         subject_opt = pd.read_table(path2, header=None, sep='\s+') # subject data from 
+        subject = subject.append(subject_prot)
+        if(os.path.isfile(path2)): # checking if Optional data for that subject exists
+           subject_opt = pd.read_table(path2, header=None, sep='\s+') # subject data from optional activities
+           subject = subject.append(subject_opt)
+         
+
+
          # optional activities
-         subject = subject.append(subject_prot)
-         subject = subject.append(subject_opt)
-         subject.columns = cols 
-         subject = subject.sort_values(by='time_stamp') # Arranging all measurements according to
+        subject.columns = cols 
+        subject = subject.sort_values(by='time_stamp') # Arranging all measurements according to
          # time
 
-        except Exception as e:
-         continue   # Continue to next iteration if file doesn't exist
         subject['id'] = i
         output = output.append(subject, ignore_index=True)
     return output
