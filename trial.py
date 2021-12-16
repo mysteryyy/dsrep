@@ -119,14 +119,9 @@ def load_subjects(root1='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject',
         if(os.path.isfile(path2)): # checking if Optional data for that subject exists
            subject_opt = pd.read_table(path2, header=None, sep='\s+') # subject data from optional activities
            subject = subject.append(subject_opt)
-         
-
-
-         # optional activities
         subject.columns = cols 
         subject = subject.sort_values(by='time_stamp') # Arranging all measurements according to
          # time
-
         subject['id'] = i
         output = output.append(subject, ignore_index=True)
     return output
