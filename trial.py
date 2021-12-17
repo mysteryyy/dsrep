@@ -6,14 +6,15 @@
 
 import os
 import pdb
+import tabula
 from IPython.display import display
 from matplotlib import rcParams
-from scipy.stats import ranksums
+from scipy.stats import ranksums,ttest_ind
 import numpy as np
 import seaborn as sns
-os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/Protocol")
 import pandas as pd
 import matplotlib.pyplot as plt
+os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/") # Setting up working directory
 
 # ## Data Cleaning
 # For tidying up the data :
@@ -130,9 +131,12 @@ data = load_subjects()# Add your own location for the data here to replicate the
 data = data.drop(data[data['activity_id']==0].index)# Removing rows with activity id of 0
 act = gen_activity_names()
 data['activity_name'] = data.activity_id.apply(lambda x:act[x])
-data = data.drop([i for i in data.columns if 'orientation' in i],axis=1)# Dropping Orientation 
-# columns
+data = data.drop([i for i in data.columns if 'orientation' in i], axis=1)  # Dropping Orientation  columns
 display(data.head())
+# Saaving transformed data in pickle format becuse it has the fastest read time compared
+# to all other formats
+data.to_pickle("activity_data.pkl")  # Saving transformed data for future use
+
 
 # **Note**: The procedure to replace missing values using the feature mean is performed
 # after hypothesis testing and EDA as filling up the missing values would lead to us getting
@@ -160,30 +164,40 @@ def train_test_split(data,split_size):
     train = data[msk] # Generating training data
     test = data[~msk] # generating testing data  
     return train,test
+data = pd.read_pickle("activity_data.pkl")
 train,test = train_test_split(data,0.50)
+subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file
+
+
 
 # ### Data Visualizations
 
-# * Boxplot of heart rate grouped by activity 
+# * Bar chart for frequency of activities.
 
 rcParams['figure.figsize'] = 40,25 # Setting the figure dimensions 
 rcParams['font.size'] = 35 # Setting the text and number font size
+ax=sns.countplot(x="activity_name",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
+plt.show()
+
+# * Boxplot of heart rate grouped by activity. 
+
 ax=sns.boxplot(x="activity_name",y="heart_rate",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-#   1. From the boxplot we can notice that activities like running and rope jumping have higher average heart rate than other activities
-#   2. 'Nordic_walking' and 'running' have a lot of outliers on the lower side
-#   3.  Activities like 'lying','sitting' and standing have a lot of outliers on the upper side.
+#   1.  Most of the activities have a skewed distribution for heart rate.
+#   2. 'Nordic_walking','running' and 'cycling' have a lot of outliers on the lower side.
+#   3.  Activities like 'lying','sitting' and 'standing' have a lot of outliers on the upper side.
 
-# * Boxplot of hand temperature grouped by activity
+# * Boxplot of hand temperature grouped by activity.
 
 ax=sns.boxplot(x="activity_name",y="hand_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-# 1. "Ironing" and "vacuum_cleaning" may have higher average hand temperatures compared to other activitiies.
-# 2. "Lying" and "standing" have outliers on the upper side while "ascending_stairs" has it on the lower side.
+# 1. Hand temperature data of 'playing_soccer' seems to have a very pronounced positive skew.
+# 2. "car_driving" and "watching_tv" have the least dispersion in hand temperature.
 
 # * Boxplot of ankle temperature grouped by activity
 
@@ -191,8 +205,8 @@ ax=sns.boxplot(x="activity_name",y="ankle_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Interestingly, we see that "ankle_temperature" might be lower on average while lying.
-# 2. Outliers are mostly present in "rope_jumping" and "vacuum_cleaning" on the lower side. 
+# 1. For ankle temperature, 'playing_soccer' has the least dispersed distribution.
+# 2. Outliers are mostly present in 'vacuum_cleaning' on the lower side. 
 
 # * Boxplot of chest temperature grouped by activity.
 
@@ -200,9 +214,8 @@ ax=sns.boxplot(x="activity_name",y="chest_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
 
-# 1. Just like ankle temperature, the mean of chest temperature seems to be lower while lying  
-#    and even "running" seems to have lower average, although the data is more widely distributed and positively skewed.
-# 2. The outliers are only present in "lying" and they are on the higher side.
+# 1. Most of the activities seem to have a skewed distribution for chest temperature.
+# 2. 'car_driving' and 'watching_tv' seem to have the least dispersed distribution.
 
 # * A joint plot trying to investigate possibility of correlation between heart rate 
 #   and chest temperature.
@@ -222,7 +235,11 @@ plt.show()
 #    a multi-modal distribution.
 
 
-# ### Decriptive Statistics
+# ### Descriptive Statistics
+# Subject Details
+
+display(subj_det[0])
+
 # Mean of heart rate and temperatures for each activity
 display(train.groupby(by='activity_name')[['heart_rate','chest_temperature','hand_temperature',
     'ankle_temperature']].mean())
@@ -283,7 +300,7 @@ print(ranksums(test1,test2,alternative='less'))
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
 
-# $H_0$(Null) : The chest temperature while lying and while doing other activities are not significantly  different.
+# $H_0$(Null) : The chest temperature while lying is likely to be equal or greater to teh chest temperature of other activities.
 # $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
 
 test1 = test[test.activity_name=='lying'].chest_temperature.dropna()
