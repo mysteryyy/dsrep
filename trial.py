@@ -11,10 +11,13 @@ from IPython.display import display
 from matplotlib import rcParams
 from scipy.stats import ranksums,ttest_ind
 import numpy as np
+import random
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/") # Setting up working directory
+import warnings
+warnings.filterwarnings("ignore")
 
 # ## Data Cleaning
 # For tidying up the data :
@@ -26,6 +29,8 @@ os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/") # Setting up working directory
 # - Similarly, the rows with Activity ID "0" are also removed as
 #   it does not relate to any specific activity.
 # - The missing values are filled up using the mean for that feature.
+# - Added a new feature, 'BMI' or Body Mass Index for the 'subject_detail' table
+ 
 
 
 
@@ -111,15 +116,12 @@ def load_subjects(root1='/home/sahil/Downloads/PAMAP2_Dataset/Protocol/subject',
     output = pd.DataFrame()
     for i in range(101,110):
         path1 = root1 + str(i) + '.dat'
-        path2 = root2 + str(i) + '.dat'
         subject= pd.DataFrame()
          
         subject_prot = pd.read_table(path1, header=None, sep='\s+') # subject data from 
          # protocol activities
         subject = subject.append(subject_prot)
-        if(os.path.isfile(path2)): # checking if Optional data for that subject exists
-           subject_opt = pd.read_table(path2, header=None, sep='\s+') # subject data from optional activities
-           subject = subject.append(subject_opt)
+
         subject.columns = cols 
         subject = subject.sort_values(by='time_stamp') # Arranging all measurements according to
          # time
@@ -132,6 +134,8 @@ data = data.drop(data[data['activity_id']==0].index)# Removing rows with activit
 act = gen_activity_names()
 data['activity_name'] = data.activity_id.apply(lambda x:act[x])
 data = data.drop([i for i in data.columns if 'orientation' in i], axis=1)  # Dropping Orientation  columns
+cols_6g = [i for i in data.columns if '_6_' in i] # 6g acceleration data columns
+data =  data.drop(cols_6g,axis=1) # dropping 6g acceleration columns
 display(data.head())
 # Saaving transformed data in pickle format becuse it has the fastest read time compared
 # to all other formats
@@ -160,24 +164,129 @@ def clean_data(data): # Function for extracting clean data
 
 def train_test_split(data,split_size):
     np.random.seed(5)
-    msk = np.random.rand(len(data)) < split_size # This code implies 80% of the values will be True
+    msk = np.random.rand(len(data)) < split_size # This code implies (split_size*100)% of the values will be True
     train = data[msk] # Generating training data
     test = data[~msk] # generating testing data  
     return train,test
-data = pd.read_pickle("activity_data.pkl")
-train,test = train_test_split(data,0.50)
-subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file
 
+def train_test_split_by_subjects(data): # splitting by subjects
+    subjects = [i for i in range(101,109)] # Eliminate subject 109  due to less activities
+    train_subjects = [101,103,104,105]
+    test_subjects = [i for i in subjects if i not in train_subjects]
+    train = data[data.id.isin(train_subjects)] # Generating training data
+    test = data[data.id.isin(test_subjects)] # generating testing data  
+    return train,test
+
+
+
+
+def random_subset(data,subset_frac): # For selecting a random subset of data
+    np.random.seed(8)
+    msk = np.random.rand(len(data)) < subset_frac # This code implies (split_size*100)% of the values will be True
+    subset = data[msk] # Generating subset
+    return subset
+
+
+
+data = pd.read_pickle("activity_data.pkl")
+train,test = train_test_split_by_subjects(data)
+subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file
+# Eliminating unnecessary columns and fixing the column alignment of the table
+sd = subj_det[0]
+new_cols = list(sd.columns)[1:9]
+sd = sd[sd.columns[0:8]]
+sd.columns = new_cols 
+subj_det=sd
+
+# Calculating BMI of the subjects
+height_in_metres = subj_det['Height (cm)']/100
+weight_in_kg = subj_det['Weight (kg)']
+subj_det['BMI'] =  weight_in_kg/(height_in_metres)**2
 
 
 # ### Data Visualizations
 
+
 # * Bar chart for frequency of activities.
 
-rcParams['figure.figsize'] = 40,25 # Setting the figure dimensions 
-rcParams['font.size'] = 35 # Setting the text and number font size
+rcParams['figure.figsize'] = 40,25
 ax=sns.countplot(x="activity_name",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
+plt.show()
+
+# * 3D scatter plot of coordinates for running
+
+plt.clf()
+train_running = train[train.activity_name=='running']
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+x = train_running["chest_3D_acceleration_16_x"]
+y = train_running["chest_3D_acceleration_16_y"]
+z = train_running["chest_3D_acceleration_16_z"]
+ax.scatter(x,y,z)
+ax.set_xlabel('X Axis')
+ax.set_ylabel('Y Axis')
+ax.set_zlabel('Z Axis')
+plt.show()
+
+# * 3D scatter plot of coordinates for lying 
+
+plt.clf()
+train_running = train[train.activity_name=='lying']
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+x = train_running["chest_3D_acceleration_16_x"]
+y = train_running["chest_3D_acceleration_16_y"]
+z = train_running["chest_3D_acceleration_16_z"]
+ax.scatter(x,y,z)
+ax.set_xlabel('X Axis')
+ax.set_ylabel('Y Axis')
+ax.set_zlabel('Z Axis')
+plt.show()
+
+# * 3D scatter plot of coordinates of all coordinates of chest acceleration
+
+plt.clf()
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+train_subset = random_subset(train,0.1)
+x = train_subset["chest_3D_acceleration_16_x"]
+y = train_subset["chest_3D_acceleration_16_y"]
+z = train_subset["chest_3D_acceleration_16_z"]
+ax.scatter(x,y,z)
+ax.set_xlabel('X Axis')
+ax.set_ylabel('Y Axis')
+ax.set_zlabel('Z Axis')
+plt.show()
+
+
+# * Boxplot of rolling mean of vertical chest acceleration
+
+train['rolling_mean'] = train['chest_3D_acceleration_16_z'].rolling(256).mean()
+ax=sns.boxplot(x="activity_name",y="rolling_mean",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
+plt.show()
+
+# * Boxplot of rolling mean of horizontal ankle acceleration along x axis
+
+train['rolling_mean'] = train['ankle_3D_acceleration_16_x'].rolling(256).mean()
+ax=sns.boxplot(x="activity_name",y="rolling_mean",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
+plt.show()
+
+# * Boxplot of rolling mean of horizontal ankle acceleration along y axis 
+
+train['rolling_mean'] = train['ankle_3D_acceleration_16_y'].rolling(256).mean()
+ax=sns.boxplot(x="activity_name",y="rolling_mean",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
+plt.show()
+
+# * Time series plot of x axis chest acceleration
+
+plt.clf()
+random.seed(4)
+train1 = train[train.id==random.choice(train.id.unique())]
+sns.lineplot(x='time_stamp',y='chest_3D_acceleration_16_z',hue='activity_name',data=train1)
 plt.show()
 
 # * Boxplot of heart rate grouped by activity. 
@@ -238,7 +347,7 @@ plt.show()
 # ### Descriptive Statistics
 # Subject Details
 
-display(subj_det[0])
+display(subj_det)
 
 # Mean of heart rate and temperatures for each activity
 display(train.groupby(by='activity_name')[['heart_rate','chest_temperature','hand_temperature',
@@ -255,6 +364,11 @@ display(train_trimmed.describe())
 # Correlation table of relevant features
 
 display(train_trimmed.corr()) 
+
+# Variance of each axis of acceleration grouped by activities
+
+coordinates = [i for i in train.columns if 'acceleration' in i]
+display(train.groupby(by='activity_name')[coordinates].var())
 
 # ## Hypothesis Testing  
 
