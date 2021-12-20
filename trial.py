@@ -237,7 +237,11 @@ ax=sns.countplot(x="activity_name",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-# * 3D scatter plot of coordinates for lying 
+
+# * 3D scatter plot of chest acceleration coordinates for lying
+#
+#   It is expected that vertical chest acceleration will be more while lying due to the
+#   movements involved and an attempt is made to check this visually over here.
 
 plt.clf()
 train_running = train[train.activity_name=='lying']
@@ -252,8 +256,14 @@ ax.set_ylabel('Y Axis')
 ax.set_zlabel('Z Axis')
 plt.show()
 
+#    As we see, there seems to be more variance along the z axis(vertical direction) than the
+#    x and y axis.
 
-# * 3D scatter plot of chest acceleraation coordinates for running
+
+# * 3D scatter plot of chest acceleration coordinates for running
+#
+#   Since running involves mostly horizontal movements for the chest, we expect
+#   most of chest acceleration data to lie on the horizontal x amd y axis.
 
 plt.clf()
 train_running = train[train.activity_name=='running']
@@ -268,6 +278,7 @@ ax.set_ylabel('Y Axis')
 ax.set_zlabel('Z Axis')
 plt.show()
 
+#   As we expected, for running, most of the points lie along the x and y axis.
 
 # * Time series plot of x axis chest acceleration
 
@@ -277,21 +288,6 @@ train1 = train[train.id==random.choice(train.id.unique())]
 sns.lineplot(x='time_stamp',y='chest_3D_acceleration_16_z',hue='activity_name',data=train1)
 plt.show()
 
-
-# * 3D scatter plot of coordinates of all coordinates of chest acceleration
-
-plt.clf()
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-train_subset = random_subset(train,0.1)
-x = train_subset["chest_3D_acceleration_16_x"]
-y = train_subset["chest_3D_acceleration_16_y"]
-z = train_subset["chest_3D_acceleration_16_z"]
-ax.scatter(x,y,z)
-ax.set_xlabel('X Axis')
-ax.set_ylabel('Y Axis')
-ax.set_zlabel('Z Axis')
-plt.show()
 
 
 # * Boxplot of rolling mean of vertical chest acceleration
@@ -324,7 +320,7 @@ plt.show()
 
 #  1. We observe that moderate and intense activities have higher heart rate than
 #     light activities as expected.
-#  2. There doesn.t seem to be much seperation between moderate and intesne activity
+#  2. There doesn't seem to be much seperation between moderate and intesne activity
 #     heart rate.
 
 
@@ -454,65 +450,51 @@ display(train.groupby(by='activity_name')[coordinates].var())
 
 # Based on the exploratory data analysis carried out, the following hypotheses are tested on  
 # the test set:
-# - Hand temperature is higher during 'ironing' and 'vacuum_cleaning' compared
-#   to other activities.
-# - Ankle temperature is lower than other activities while lying.
-# - Chest temperature is lower while lying compared to other activities. 
-# - Rolling mean of vertical chest acceleration is higher for lying than other activities
+# - Heart rate of moderate activities are greater than heart rate of light activities.
+# - Heart rate of intense activities are greater than heart rate of light activities.
+# - Chest acceleration along z axis is greater than that along x axis during lying.
 
 
 # Based on the EDA  we performed, it does not seem that the data is normally distributed. It is 
 # for this reason that Wilcoxon rank sum test was used to test the above hypothesis instead of the usual t-test which assumes that the samples follow a normal distribution.
 # We test the above hypothesis using the confidence level of 5%.
 
-# $H_0$(Null) : The hand temperature while ironing and while doing other activities are not significantly  different.
-# $H_1$(Alternate) : The hand temperature while ironing is likely to be higher compared to other activities.
+# ### Hypothesis 1
+# $H_0$(Null) : The heart rate during  moderate activities are the same or lower than that of light activities. 
+# $H_1$(Alternate) : The heart rate during moderate activities are likely to be higher during lying compared to light activities.  
 
-test1 = test[test.activity_name=='ironing'].hand_temperature.dropna()# Hand temperature while ironing
-test2 = test[test.activity_name!='ironing'].hand_temperature.dropna()# hand temperature while not ironing.Nan values dropped to get the actual size of samples.
+test1 = test[test.activity_type=='moderate'].heart_rate.dropna()# Heart rate of moderate activities with nan values dropped
+test2 = test[test.activity_type=='light'].heart_rate.dropna()# Heart rate of light activities with nan values dropped
 print(ranksums(test1,test2,alternative='greater'))
 
-# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
-# the alternate hypothesis. 
+# ### Hypothesis 2
+# $H_0$(Null) : The heart rate during intense activities are the same or lower than that of light activities. 
+# $H_1$(Alternate) : The heart rate during intense activities are likely to be higher during than during lower activities.  
 
-# $H_0$(Null) : The hand temperature while 'vacuum_cleaning' and while doing other activities are not significantly  different.
-# $H_1$(Alternate) : The hand temperature while 'vacuum_cleaning' is likely to be higher compared to other activities.
-
-test1 = test[test.activity_name=='vacuum_cleaning'].hand_temperature.dropna()
-test2 = test[test.activity_name!='vacuum_cleaning'].hand_temperature.dropna()
+test1 = test[test.activity_type=='intense'].heart_rate.dropna()# Heart rate of moderate activities with nan values dropped
+test2 = test[test.activity_type=='light'].heart_rate.dropna()# Heart rate of light activities with nan values dropped
 print(ranksums(test1,test2,alternative='greater'))
 
-# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
-# the alternate hypothesis. 
-
-# $H_0$(Null) : The ankle temperature while lying and while doing other activities are not significantly  different.
-# $H_1$(Alternate) : The ankle temperature while lying is likely to be lower compared to other activities.
-
-test1 = test[test.activity_name=='lying'].ankle_temperature.dropna()
-test2 = test[test.activity_name!='lying'].ankle_temperature.dropna()
-print(ranksums(test1,test2,alternative='less'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
-
-# $H_0$(Null) : The chest temperature while lying is likely to be equal or greater to teh chest temperature of other activities.
-# $H_1$(Alternate) : The chest temperature while lying is likely to be lower compared to other activities.
-
-test1 = test[test.activity_name=='lying'].chest_temperature.dropna()
-test2 = test[test.activity_name!='lying'].chest_temperature.dropna()
-print(ranksums(test1,test2,alternative='less'))
-
-# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
-# the alternate hypothesis. 
-
-# $H_0$(Null) : The rolling mean for vertical chest temperature is same as other activities.
-# $H_1$(Alternate) : The rolling mean for vertical chest acceleration is likely to be higher compared to other activities.
 
 test['rolling_mean'] = test['chest_3D_acceleration_16_z'].rolling(256).mean()
 test1 = test[test.activity_name=='lying'].rolling_mean.dropna()
 test2 = test[test.activity_name!='lying'].rolling_mean.dropna()
 print(ranksums(test1,test2,alternative='greater'))
 
+# ### Hypothesis 3
+# $H_0$(Null) : The z axis chest acceleration during lying is lower or same as the x axis acceleration. 
+# $H_1$(Alternate) :The z axis chest acceleration during lying is higher than the x axis acceleration. 
+
+
+test_l = test[test.activity_name=='lying']
+feature1='chest_3D_acceleration_16_z'
+feature2='chest_3D_acceleration_16_x'
+test1 = test_l[feature1]
+test2 = test_l[feature2]
+print(ranksums(test1,test2,alternative='greater'))
+
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
-
