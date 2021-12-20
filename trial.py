@@ -143,25 +143,23 @@ data = data.drop([i for i in data.columns if 'orientation' in i], axis=1)  # Dro
 cols_6g = [i for i in data.columns if '_6_' in i] # 6g acceleration data columns
 data =  data.drop(cols_6g,axis=1) # dropping 6g acceleration columns
 display(data.head())
-
-# Saaving transformed data in pickle format becuse it has the fastest read time compared
+# Saving transformed data in pickle format becuse it has the fastest read time compared
 # to all other formats
 data.to_pickle("activity_data.pkl")  # Saving transformed data for future use
 
 
-# **Note**: The procedure to replace missing values using the feature mean is performed
-# after hypothesis testing and EDA as filling up the missing values would lead to us getting
-# incorrect sample sizes for hypotheses testing. For Hypotheses testing the blank rows of an 
-# attribute will simply be ignored.
+# In order to create clean data for model prediction,  linear interpolation technique is used to fill in missing values.
 
+eliminate = ['activity_id','activity_name','time_stamp','id'] # Columns not meant to be cleaned
+features = [i for i in data.columns if i not in eliminate]
+clean_data = data
+clean_data[features] =clean_data[features].interpolate()
+display(clean_data.head())
 
-def clean_data(data): # Function for extracting clean data
-    #data = data.interpolate()
-    # fill all the NaN values in a column with the mean values of the column
-    for colName in data.columns:
-        data[colName] = data[colName].fillna(data[colName].mean())
-    return data
+# After linear interpolation, the first four values of heart rate are still missing. So we fill that using back fill method. 
 
+clean_data['heart_rate'] = clean_data['heart_rate'].bfill()
+display(clean_data.head())
 
 # ## Exploratory Data Analysis
 # After labelling the data appropriately, we have selected 4 subjects for training set and 
@@ -514,3 +512,14 @@ print(ranksums(test1,test2,alternative='greater'))
 
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
+
+# ## Model Prediction
+
+features = [i for i in data.columns if i not in discard]
+data[features] = data[features].interpolate()
+
+# ### Adding and Selecting Features
+
+ 
+
+
