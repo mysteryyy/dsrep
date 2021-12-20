@@ -30,7 +30,13 @@ warnings.filterwarnings("ignore")
 #   it does not relate to any specific activity.
 # - The missing values are filled up using the mean for that feature.
 # - Added a new feature, 'BMI' or Body Mass Index for the 'subject_detail' table
- 
+# - Additional feature, 'Activity Type' is added to the data which classifies activities 
+#   into 3 classes, 'Light' activity,'Moderate' activity and 'Intense' activity.
+#   1. Lying,sitting,ironing and standing are labelled as 'light' activities.
+#   2. Vacuum cleaning,descending stairs,normal walking,Nordic walking and cycling are
+#      considered as 'Moderate' activities
+#   3. Ascending stairs,running and rope jumping are labelled as 'Intense' activities.  
+#   This classification makes it easier to perform hypothesis testing between pair of attributes.
 
 
 
@@ -137,6 +143,7 @@ data = data.drop([i for i in data.columns if 'orientation' in i], axis=1)  # Dro
 cols_6g = [i for i in data.columns if '_6_' in i] # 6g acceleration data columns
 data =  data.drop(cols_6g,axis=1) # dropping 6g acceleration columns
 display(data.head())
+
 # Saaving transformed data in pickle format becuse it has the fastest read time compared
 # to all other formats
 data.to_pickle("activity_data.pkl")  # Saving transformed data for future use
@@ -157,10 +164,11 @@ def clean_data(data): # Function for extracting clean data
 
 
 # ## Exploratory Data Analysis
-# After labelling the data appropriately, it is randomly split into training and testing sets. 
+# After labelling the data appropriately, we have selected 4 subjects for training set and 
+# 4 subjects for testing set such that the training and testing set have approximately equal size.
 # In the training set, we perform Exploratory Data Analysis and come up with potential hypotheses. 
 # We then test those hypotheses on the testing set.
-# 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing
+# 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing.
 
 def train_test_split(data,split_size):
     np.random.seed(5)
@@ -177,6 +185,20 @@ def train_test_split_by_subjects(data): # splitting by subjects
     test = data[data.id.isin(test_subjects)] # generating testing data  
     return train,test
 
+def split_by_activities(data):
+   light = ['lying','sitting','standing','ironing'] 
+   moderate = ['vacuum_cleaning','descending_stairs','normal_walking',
+           'nordic_walking','cycling']
+   intense = ['ascending_stairs','running','rope_jumping']
+   def split(activity): #  method for returning activity labels for activities
+       if activity in light:
+           return 'light'
+       elif activity in moderate:
+           return 'moderate'
+       else:
+           return 'intense'
+   data['activity_type'] = data.activity_name.apply(lambda x:split(x))
+   return data
 
 
 
@@ -189,6 +211,7 @@ def random_subset(data,subset_frac): # For selecting a random subset of data
 
 
 data = pd.read_pickle("activity_data.pkl")
+data = split_by_activities(data)
 train,test = train_test_split_by_subjects(data)
 subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file
 # Eliminating unnecessary columns and fixing the column alignment of the table
@@ -214,21 +237,6 @@ ax=sns.countplot(x="activity_name",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-# * 3D scatter plot of coordinates for running
-
-plt.clf()
-train_running = train[train.activity_name=='running']
-fig = plt.figure()
-ax = fig.add_subplot(projection='3d')
-x = train_running["chest_3D_acceleration_16_x"]
-y = train_running["chest_3D_acceleration_16_y"]
-z = train_running["chest_3D_acceleration_16_z"]
-ax.scatter(x,y,z)
-ax.set_xlabel('X Axis')
-ax.set_ylabel('Y Axis')
-ax.set_zlabel('Z Axis')
-plt.show()
-
 # * 3D scatter plot of coordinates for lying 
 
 plt.clf()
@@ -243,6 +251,32 @@ ax.set_xlabel('X Axis')
 ax.set_ylabel('Y Axis')
 ax.set_zlabel('Z Axis')
 plt.show()
+
+
+# * 3D scatter plot of chest acceleraation coordinates for running
+
+plt.clf()
+train_running = train[train.activity_name=='running']
+fig = plt.figure()
+ax = fig.add_subplot(projection='3d')
+x = train_running["chest_3D_acceleration_16_x"]
+y = train_running["chest_3D_acceleration_16_y"]
+z = train_running["chest_3D_acceleration_16_z"]
+ax.scatter(x,y,z)
+ax.set_xlabel('X Axis')
+ax.set_ylabel('Y Axis')
+ax.set_zlabel('Z Axis')
+plt.show()
+
+
+# * Time series plot of x axis chest acceleration
+
+plt.clf()
+random.seed(4)
+train1 = train[train.id==random.choice(train.id.unique())]
+sns.lineplot(x='time_stamp',y='chest_3D_acceleration_16_z',hue='activity_name',data=train1)
+plt.show()
+
 
 # * 3D scatter plot of coordinates of all coordinates of chest acceleration
 
@@ -281,16 +315,23 @@ ax=sns.boxplot(x="activity_name",y="rolling_mean",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
 
-# * Time series plot of x axis chest acceleration
+# * Boxplot of heart rate grouped by activity type. 
 
-plt.clf()
-random.seed(4)
-train1 = train[train.id==random.choice(train.id.unique())]
-sns.lineplot(x='time_stamp',y='chest_3D_acceleration_16_z',hue='activity_name',data=train1)
+rcParams['figure.figsize'] = 15,10
+ax=sns.boxplot(x="activity_type",y="heart_rate",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=0)# Rotating Text
 plt.show()
+
+#  1. We observe that moderate and intense activities have higher heart rate than
+#     light activities as expected.
+#  2. There doesn.t seem to be much seperation between moderate and intesne activity
+#     heart rate.
+
+
 
 # * Boxplot of heart rate grouped by activity. 
 
+rcParams['figure.figsize'] = 40,25
 ax=sns.boxplot(x="activity_name",y="heart_rate",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
@@ -299,8 +340,22 @@ plt.show()
 #   2. 'Nordic_walking','running' and 'cycling' have a lot of outliers on the lower side.
 #   3.  Activities like 'lying','sitting' and 'standing' have a lot of outliers on the upper side.
 
+# * Boxplot of hand temperature grouped by activity type.
+
+
+rcParams['figure.figsize'] = 15,10
+ax=sns.boxplot(x="activity_type",y="hand_temperature",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=0)
+plt.show()
+
+# 1. Hand temperature of moderate activitie have a lot of outliers on the lower side.
+# 2. There doesn't seem to be much difference in temperatures between activities.
+
 # * Boxplot of hand temperature grouped by activity.
 
+
+
+rcParams['figure.figsize'] = 40,25
 ax=sns.boxplot(x="activity_name",y="hand_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45)# Rotating Text
 plt.show()
@@ -308,8 +363,20 @@ plt.show()
 # 1. Hand temperature data of 'playing_soccer' seems to have a very pronounced positive skew.
 # 2. "car_driving" and "watching_tv" have the least dispersion in hand temperature.
 
+# * Boxplot of ankle temperature grouped by activity_type
+
+
+rcParams['figure.figsize'] = 15,10
+ax=sns.boxplot(x="activity_type",y="ankle_temperature",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=0) 
+plt.show()
+
+# 1. Ankle temperature of light and moderate activitie have  outliers on the lower side.
+# 2. There doesn't seem to be much difference in temperatures between activities.
+
 # * Boxplot of ankle temperature grouped by activity
 
+rcParams['figure.figsize'] = 40,25
 ax=sns.boxplot(x="activity_name",y="ankle_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
@@ -317,8 +384,21 @@ plt.show()
 # 1. For ankle temperature, 'playing_soccer' has the least dispersed distribution.
 # 2. Outliers are mostly present in 'vacuum_cleaning' on the lower side. 
 
+# * Boxplot of chest temperature grouped by activity_type
+
+
+rcParams['figure.figsize'] = 15,10
+ax=sns.boxplot(x="activity_type",y="chest_temperature",data=train)
+ax.set_xticklabels(ax.get_xticklabels(),rotation=0) 
+plt.show()
+
+# 1. For chest temperatures, only the 'intense' activity type has an outlier.
+# 2. For this feature as well, there doesn't seem to be much difference between 
+#    temperatures.
+
 # * Boxplot of chest temperature grouped by activity.
 
+rcParams['figure.figsize'] = 40,25
 ax=sns.boxplot(x="activity_name",y="chest_temperature",data=train)
 ax.set_xticklabels(ax.get_xticklabels(),rotation=45) # Rotating Text
 plt.show()
@@ -378,6 +458,7 @@ display(train.groupby(by='activity_name')[coordinates].var())
 #   to other activities.
 # - Ankle temperature is lower than other activities while lying.
 # - Chest temperature is lower while lying compared to other activities. 
+# - Rolling mean of vertical chest acceleration is higher for lying than other activities
 
 
 # Based on the EDA  we performed, it does not seem that the data is normally distributed. It is 
@@ -424,5 +505,14 @@ print(ranksums(test1,test2,alternative='less'))
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
 
+# $H_0$(Null) : The rolling mean for vertical chest temperature is same as other activities.
+# $H_1$(Alternate) : The rolling mean for vertical chest acceleration is likely to be higher compared to other activities.
 
+test['rolling_mean'] = test['chest_3D_acceleration_16_z'].rolling(256).mean()
+test1 = test[test.activity_name=='lying'].rolling_mean.dropna()
+test2 = test[test.activity_name!='lying'].rolling_mean.dropna()
+print(ranksums(test1,test2,alternative='greater'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
 
