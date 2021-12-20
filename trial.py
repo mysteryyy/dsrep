@@ -453,6 +453,7 @@ display(train.groupby(by='activity_name')[coordinates].var())
 # - Heart rate of moderate activities are greater than heart rate of light activities.
 # - Heart rate of intense activities are greater than heart rate of light activities.
 # - Chest acceleration along z axis is greater than that along x axis during lying.
+# - Chest acceleration along x axis is greater than that along z axis during running.
 
 
 # Based on the EDA  we performed, it does not seem that the data is normally distributed. It is 
@@ -492,6 +493,21 @@ print(ranksums(test1,test2,alternative='greater'))
 test_l = test[test.activity_name=='lying']
 feature1='chest_3D_acceleration_16_z'
 feature2='chest_3D_acceleration_16_x'
+test1 = test_l[feature1]
+test2 = test_l[feature2]
+print(ranksums(test1,test2,alternative='greater'))
+
+# Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
+# the alternate hypothesis. 
+
+# ### Hypothesis 4
+# $H_0$(Null) : The x axis chest acceleration during running is lower or same as the z axis acceleration. 
+# $H_1$(Alternate) :The x axis chest acceleration during lying is higher than the z axis acceleration. 
+
+
+test_l = test[test.activity_name=='running']
+feature1='chest_3D_acceleration_16_x'
+feature2='chest_3D_acceleration_16_z'
 test1 = test_l[feature1]
 test2 = test_l[feature2]
 print(ranksums(test1,test2,alternative='greater'))
