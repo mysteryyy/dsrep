@@ -15,6 +15,11 @@ import random
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.linear_model import  LogisticRegression
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import classification_report
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import preprocessing
 os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/") # Setting up working directory
 import warnings
 warnings.filterwarnings("ignore")
@@ -148,25 +153,7 @@ display(data.head())
 data.to_pickle("activity_data.pkl")  # Saving transformed data for future use
 
 
-# In order to create clean data for model prediction,  linear interpolation technique is used to fill in missing values.
 
-eliminate = ['activity_id','activity_name','time_stamp','id'] # Columns not meant to be cleaned
-features = [i for i in data.columns if i not in eliminate]
-clean_data = data
-clean_data[features] =clean_data[features].interpolate()
-display(clean_data.head())
-
-# After linear interpolation, the first four values of heart rate are still missing. So we fill that using back fill method. 
-
-clean_data['heart_rate'] = clean_data['heart_rate'].bfill()
-display(clean_data.head())
-
-# ## Exploratory Data Analysis
-# After labelling the data appropriately, we have selected 4 subjects for training set and 
-# 4 subjects for testing set such that the training and testing set have approximately equal size.
-# In the training set, we perform Exploratory Data Analysis and come up with potential hypotheses. 
-# We then test those hypotheses on the testing set.
-# 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing.
 
 def train_test_split(data,split_size):
     np.random.seed(5)
@@ -206,18 +193,38 @@ def random_subset(data,subset_frac): # For selecting a random subset of data
     subset = data[msk] # Generating subset
     return subset
 
-
-
+# Loading data and doing the train-test split for EDA and Hypothesis testing.
 data = pd.read_pickle("activity_data.pkl")
 data = split_by_activities(data)
-train,test = train_test_split_by_subjects(data)
-subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file
-# Eliminating unnecessary columns and fixing the column alignment of the table
+train,test = train_test_split_by_subjects(data) # train and test data for EDA and hypothesis testing respectively.
+subj_det = tabula.read_pdf("subjectInformation.pdf",pages=1) # loading subject detail table from pdf file.
+# Eliminating unnecessary columns and fixing the column alignment of the table.
 sd = subj_det[0]
 new_cols = list(sd.columns)[1:9]
 sd = sd[sd.columns[0:8]]
 sd.columns = new_cols 
 subj_det=sd
+
+# Create clean data for use in modelling
+eliminate = ['activity_id','activity_name','time_stamp','id'] # Columns not meant to be cleaned
+features = [i for i in data.columns if i not in eliminate]
+clean_data = data
+clean_data[features] =clean_data[features].interpolate()
+display(clean_data.head())
+
+# After linear interpolation, the first four values of heart rate are still missing. So we fill that using back fill method.
+clean_data['heart_rate'] = clean_data['heart_rate'].bfill()
+display(clean_data.head())
+
+# Finally, save the clean data for future use in model prediction
+clean_data.to_pickle("clean_act_data.pkl")
+
+# ## Exploratory Data Analysis
+# After labelling the data appropriately, we have selected 4 subjects for training set and 
+# 4 subjects for testing set such that the training and testing set have approximately equal size.
+# In the training set, we perform Exploratory Data Analysis and come up with potential hypotheses. 
+# We then test those hypotheses on the testing set.
+# 50% of data is used for training in this case(Exploratory data analysis) and the rest for testing.
 
 # Calculating BMI of the subjects
 height_in_metres = subj_det['Height (cm)']/100
@@ -515,11 +522,36 @@ print(ranksums(test1,test2,alternative='greater'))
 
 # ## Model Prediction
 
-features = [i for i in data.columns if i not in discard]
-data[features] = data[features].interpolate()
+clean_data = pd.read_pickle("clean_act_data.pkl")
+le = preprocessing.LabelEncoder()
+roll_coll=[i for i in clean_data.columns if '_roll_' in i]
+discard = ['activity_id','activity','activity_name','time_stamp', \
+           'id','activity_type']# Columns to exclude from descriptive statistics
+features = [i for i in clean_data.columns if i not in discard]
+train_subjects = [101,103,104,105]
+train = clean_data[clean_data.id.isin(train_subjects)]
+val = clean_data[clean_data.id.isin([102,106])]
+test = clean_data[clean_data.id.isin([107,108])]
+x_train = train[features]
+x_val = val[features]
+x_test = test[features]
+y_train = le.fit_transform(train.activity_type)
+y_val = le.fit_transform(val.activity_type)
+y_test = le.fit_transform(test.activity_type)
 
-# ### Adding and Selecting Features
-
- 
-
+def create_sliding_window_feats(data,feats,win_len):
+   for feat in feats:
+       data[f'{feat}_roll_mean'] = data[feat].rolling(win_len).mean()
+       data[f'{feat}_roll_median'] = data[feat].rolling(win_len).mean()
+       data[f'{feat}_roll_var'] = data[feat].rolling(win_len).var()
+       data = data.dropna()
+   return data
+acc_cols = [i for i in clean_data.columns if 'acceleration' in i] 
+final=[]
+for i in clean_data.id.unique():
+   temp = clean_data[clean_data.id==i]
+   temp = create_sliding_window_feats(temp,acc_cols,256)
+   final.append(temp)
+clean_data = pd.concat(final) 
+print(clean_data[[i for i in clean_data.columns if 'roll' in i]].head())
 
