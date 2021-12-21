@@ -17,8 +17,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import  LogisticRegression
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.decomposition import PCA
 from sklearn.metrics import classification_report
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import classification_report
 from sklearn import preprocessing
 os.chdir("/home/sahil/Downloads/PAMAP2_Dataset/") # Setting up working directory
 import warnings
@@ -33,7 +35,7 @@ warnings.filterwarnings("ignore")
 #   in the data report that it is invalid in this data collection.
 # - Similarly, the rows with Activity ID "0" are also removed as
 #   it does not relate to any specific activity.
-# - The missing values are filled up using the mean for that feature.
+# - The missing values are filled up using the linear interpolation method.
 # - Added a new feature, 'BMI' or Body Mass Index for the 'subject_detail' table
 # - Additional feature, 'Activity Type' is added to the data which classifies activities 
 #   into 3 classes, 'Light' activity,'Moderate' activity and 'Intense' activity.
@@ -485,10 +487,6 @@ print(ranksums(test1,test2,alternative='greater'))
 # Since we get a p-value of 0 which is lower than 0.05 we reject the null hypothesis and accept
 # the alternate hypothesis. 
 
-test['rolling_mean'] = test['chest_3D_acceleration_16_z'].rolling(256).mean()
-test1 = test[test.activity_name=='lying'].rolling_mean.dropna()
-test2 = test[test.activity_name!='lying'].rolling_mean.dropna()
-print(ranksums(test1,test2,alternative='greater'))
 
 # ### Hypothesis 3
 # $H_0$(Null) : The z axis chest acceleration during lying is lower or same as the x axis acceleration. 
@@ -523,29 +521,33 @@ print(ranksums(test1,test2,alternative='greater'))
 # ## Model Prediction
 
 clean_data = pd.read_pickle("clean_act_data.pkl")
-le = preprocessing.LabelEncoder()
-roll_coll=[i for i in clean_data.columns if '_roll_' in i]
-discard = ['activity_id','activity','activity_name','time_stamp', \
-           'id','activity_type']# Columns to exclude from descriptive statistics
-features = [i for i in clean_data.columns if i not in discard]
-train_subjects = [101,103,104,105]
-train = clean_data[clean_data.id.isin(train_subjects)]
-val = clean_data[clean_data.id.isin([102,106])]
-test = clean_data[clean_data.id.isin([107,108])]
-x_train = train[features]
-x_val = val[features]
-x_test = test[features]
-y_train = le.fit_transform(train.activity_type)
-y_val = le.fit_transform(val.activity_type)
-y_test = le.fit_transform(test.activity_type)
 
+train_subjects = [101,103,104,105]
 def create_sliding_window_feats(data,feats,win_len):
+   pca = PCA(n_components=1)
+   hand_coords = [f'hand_3D_acceleration_16_{i}' for i in ['x','y','z']] 
+   chest_coords = [f'chest_3D_acceleration_16_{i}' for i in ['x','y','z']] 
+   ankle_coords = [f'ankle_3D_acceleration_16_{i}' for i in ['x','y','z']] 
    for feat in feats:
        data[f'{feat}_roll_mean'] = data[feat].rolling(win_len).mean()
        data[f'{feat}_roll_median'] = data[feat].rolling(win_len).mean()
        data[f'{feat}_roll_var'] = data[feat].rolling(win_len).var()
        data = data.dropna()
    return data
+   
+def train_test_split(features):
+    train = clean_data[clean_data.id.isin(train_subjects)]
+    val = clean_data[clean_data.id.isin([102,106])]
+    test = clean_data[clean_data.id.isin([107,108])]
+    x_train = train[features]
+    x_val = val[features]
+    x_test = test[features]
+    y_train = le.fit_transform(train.activity_type)
+    y_val = le.fit_transform(val.activity_type)
+    y_test = le.fit_transform(test.activity_type)
+    return x_train,x_val,x_test,y_train,y_val,y_test
+
+
 acc_cols = [i for i in clean_data.columns if 'acceleration' in i] 
 final=[]
 for i in clean_data.id.unique():
@@ -554,4 +556,11 @@ for i in clean_data.id.unique():
    final.append(temp)
 clean_data = pd.concat(final) 
 print(clean_data[[i for i in clean_data.columns if 'roll' in i]].head())
+
+le = preprocessing.LabelEncoder()
+roll_coll=[i for i in clean_data.columns if '_roll_' in i]
+discard = ['activity_id','activity','activity_name','time_stamp', \
+           'id','activity_type']# Columns to exclude from descriptive statistics
+features = [i for i in clean_data.columns if i not in discard]
+x_train,x_val,x_tes,y_train,y_val,y_test = train_test_split(features)
 
