@@ -11,6 +11,7 @@ from IPython.display import display
 from matplotlib import rcParams
 from scipy.stats import ranksums,ttest_ind
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 import random
 import seaborn as sns
 import pandas as pd
@@ -562,5 +563,5 @@ roll_coll=[i for i in clean_data.columns if '_roll_' in i]
 discard = ['activity_id','activity','activity_name','time_stamp', \
            'id','activity_type']# Columns to exclude from descriptive statistics
 features = [i for i in clean_data.columns if i not in discard]
-x_train,x_val,x_tes,y_train,y_val,y_test = train_test_split(features)
+x_train,x_val,x_test,y_train,y_val,y_test = train_test_split(features)
 
