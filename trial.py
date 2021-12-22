@@ -187,6 +187,18 @@ def split_by_activities(data):
            return 'intense'
    data['activity_type'] = data.activity_name.apply(lambda x:split(x))
    return data
+def split_by_activities(data):
+   main = ['lying','sitting','standing','walking','running','cycling'] 
+   others = [i for i in data.activity_name.unqiue() if i not in main]
+   sit_stand = ['sitting','standing']
+   if activity in main:
+       if activity in sit_stand:
+           return 'sitting/standing'
+       else:
+           return activity
+   else:
+       return 'others'
+
 
 
 
