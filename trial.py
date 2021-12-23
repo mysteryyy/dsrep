@@ -187,6 +187,7 @@ def split_by_activities(data):
            return 'intense'
    data['activity_type'] = data.activity_name.apply(lambda x:split(x))
    return data
+
 def split_by_activities(data):
    main = ['lying','sitting','standing','walking','running','cycling'] 
    others = [i for i in data.activity_name.unqiue() if i not in main]
@@ -548,18 +549,6 @@ def create_sliding_window_feats(data,feats,win_len):
        data = data.dropna()
    return data
    
-def train_test_split(features):
-    train = clean_data[clean_data.id.isin(train_subjects)]
-    val = clean_data[clean_data.id.isin([102,106])]
-    test = clean_data[clean_data.id.isin([107,108])]
-    x_train = train[features]
-    x_val = val[features]
-    x_test = test[features]
-    y_train = le.fit_transform(train.activity_type)
-    y_val = le.fit_transform(val.activity_type)
-    y_test = le.fit_transform(test.activity_type)
-    return x_train,x_val,x_test,y_train,y_val,y_test
-
 
 acc_cols = [i for i in clean_data.columns if 'acceleration' in i] 
 final=[]
