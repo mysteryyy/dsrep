@@ -7,8 +7,11 @@
 import os
 import pdb
 import tabula
+import itertools
+import antropy as ant
 from IPython.display import display
 from matplotlib import rcParams
+from numpy.fft import rfft
 from scipy.stats import ranksums,ttest_ind
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -17,9 +20,10 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import  LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.decomposition import PCA
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report,accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
 from sklearn import preprocessing
@@ -225,11 +229,11 @@ subj_det=sd
 eliminate = ['activity_id','activity_name','time_stamp','id'] # Columns not meant to be cleaned
 features = [i for i in data.columns if i not in eliminate]
 clean_data = data
-clean_data[features] =clean_data[features].interpolate()
+clean_data[features] =clean_data[features].ffill()
 display(clean_data.head())
 
 # After linear interpolation, the first four values of heart rate are still missing. So we fill that using back fill method.
-clean_data['heart_rate'] = clean_data['heart_rate'].bfill()
+clean_data = clean_data.dropna()
 display(clean_data.head())
 
 # Finally, save the clean data for future use in model prediction
@@ -535,34 +539,131 @@ print(ranksums(test1,test2,alternative='greater'))
 # ## Model Prediction
 
 clean_data = pd.read_pickle("clean_act_data.pkl")
-
 train_subjects = [101,103,104,105]
-def create_sliding_window_feats(data,feats,win_len):
-   pca = PCA(n_components=1)
+discard = ['activity_id','activity','activity_name','time_stamp','id','activity_type']# Columns to exclude from descriptive stat
+def determine_axis(feat):
+    if 'x' in feat:
+        return 'x'
+    elif 'y' in feat:
+        return 'y'
+    else:
+        return 'z'
+def spectral_centroid(signal):
+    spectrum = np.abs(np.fft.rfft(signal))
+    normalized_spectrum = spectrum / np.sum(spectrum)  # like a probability mass function
+    normalized_frequencies = np.linspace(0, 1, len(spectrum))
+    spectral_centroid = np.sum(normalized_frequencies * normalized_spectrum)
+    return spectral_centroid
+def peak_freq(data):
+    dt=0.01
+    n = len(data)
+    fhat = np.fft.fft(data,n)                     # Compute the FFT
+    PSD = fhat * np.conj(fhat) / n             # Power spectrum (power per freq)
+    freq = (1/(dt*n)) * np.arange(n)           # Create x-axis of frequencies in Hz
+    return freq[np.argmax(fhat[0:n//2])]
+    #L = np.arange(1,np.floor(n/2),dtype='int') # Only consider the first half
+def peak_freq2(data):
+    dt=0.01
+    n = len(data)
+    fhat = np.fft.fft(data,n)                     # compute the fft
+    psd = fhat * np.conj(fhat) / n             # power spectrum (power per freq)
+    freq = (1/(dt*n)) * np.arange(n)           # create x-axis of frequencies in hz
+    return freq[np.argmax(psd)]
+    #l = np.arange(1,np.floor(n/2),dtype='int') # only consider the first half
+
+def sliding_window_feats(data,feats,win_len,step):
+    final=[]
+    i=0
+    for i in range(0,len(data),100):
+        if((i+256) > len(data)):
+            break
+        temp = data.iloc[i:i+256]
+        temp1 = pd.DataFrame()
+        for feat in feats:
+            temp1[f'{feat}_roll_mean'] = [temp[feat].mean()]
+            temp1[f'{feat}_roll_median'] = [temp[feat].median()]
+            temp1[f'{feat}_roll_var'] = [temp[feat].var()]
+            temp1[f'{feat}_spectral_centroid'] = [spectral_centroid(temp[feat])]
+        temp1['time_stamp'] = [list(temp.time_stamp.values)[-1]]
+        temp1[feats] = [temp[feats].iloc[-1]]
+        temp1['activity_name'] = [temp['activity_name'].iloc[-1]]
+        temp1['activity_type'] = [temp['activity_type'].iloc[-1]]
+        final.append(temp1)
+    final_data = pd.concat(final)
+    return final_data
+
+
+def create_sliding_window_corr(data,win_len):
    hand_coords = [f'hand_3D_acceleration_16_{i}' for i in ['x','y','z']] 
    chest_coords = [f'chest_3D_acceleration_16_{i}' for i in ['x','y','z']] 
    ankle_coords = [f'ankle_3D_acceleration_16_{i}' for i in ['x','y','z']] 
+   def calc_corr(coords):
+      for i in itertools.combinations(coords,2):
+        ax1 = determine_axis(i[0])
+        ax2 = determine_axis(i[1])
+        coord_type = coords[0][0:5]
+        if '_' in coord_type:
+            coord_type = coord_type[:-1]
+        data[f'{coord_type}_{ax1}_{ax2}_corr']=data[
+        i[0]].rolling(win_len).corr(data[i[1]])
+      return data
+   data = calc_corr(hand_coords)
+   data = calc_corr(chest_coords)
+   data = calc_corr(ankle_coords) 
+   return data
+def create_sliding_window_feats(data,feats,win_len):
    for feat in feats:
        data[f'{feat}_roll_mean'] = data[feat].rolling(win_len).mean()
-       data[f'{feat}_roll_median'] = data[feat].rolling(win_len).mean()
+       data[f'{feat}_roll_median'] = data[feat].rolling(win_len).median()
        data[f'{feat}_roll_var'] = data[feat].rolling(win_len).var()
-       data = data.dropna()
+#        data = data.dropna()
    return data
-   
+def train_test_split_acttype(clean_data,features):
+    clean_data = clean_data.dropna()
+    train = clean_data[clean_data.id.isin(train_subjects)]
+    val = clean_data[clean_data.id.isin([102,106])]
+    test = clean_data[clean_data.id.isin([107,108])]
+    x_train = train[features]
+    x_val = val[features]
+    x_test = test[features]
+    y_train = le.fit_transform(train.activity_type)
+    y_val = le.fit_transform(val.activity_type)
+    y_test = le.fit_transform(test.activity_type)
+    return x_train,x_val,x_test,y_train,y_val,y_test
+def train_test_split_actname(clean_data,features):
+    le = preprocessing.LabelEncoder()
+    clean_data = clean_data.dropna()
+    train = clean_data[clean_data.id.isin(train_subjects)]
+    val = clean_data[clean_data.id.isin([102,106])]
+    test = clean_data[clean_data.id.isin([107,108])]
+    x_train = train[features]
+    x_val = val[features]
+    x_test = test[features]
+    y_train = le.fit_transform(train.activity_name)
+    y_val = le.fit_transform(val.activity_name)
+    y_test = le.fit_transform(test.activity_name)
+    return x_train,x_val,x_test,y_train,y_val,y_test 
 
-acc_cols = [i for i in clean_data.columns if 'acceleration' in i] 
+
+feats = [i for i in clean_data.columns if i not in discard]
 final=[]
 for i in clean_data.id.unique():
    temp = clean_data[clean_data.id==i]
-   temp = create_sliding_window_feats(temp,acc_cols,256)
+   temp = sliding_window_feats(temp,feats,256,100)
+   temp['id'] = [i]*len(temp)
    final.append(temp)
-clean_data = pd.concat(final) 
-print(clean_data[[i for i in clean_data.columns if 'roll' in i]].head())
+clean_data_feats = pd.concat(final) 
+clean_data_feats.to_pickle("activity_short_data.pkl")
+# print(clean_data[[i for i in clean_data.columns if 'roll' in i]].head())
+clean_data_feats = pd.read_pickle("activity_short_data.pkl")
+features = [i for i in clean_data_feats.columns if i not in discard]
+x_train,x_val,x_test,y_train,y_val,y_test = train_test_split_actname(clean_data_feats,features)
+rf = RandomForestClassifier(min_samples_split=6,max_depth=130)
+rf.fit(x_train,y_train)
+print("accuracy: ")
+print(accuracy_score(rf.predict(x_val),y_val))
+print("Thank You")
 
-le = preprocessing.LabelEncoder()
-roll_coll=[i for i in clean_data.columns if '_roll_' in i]
-discard = ['activity_id','activity','activity_name','time_stamp', \
-           'id','activity_type']# Columns to exclude from descriptive statistics
-features = [i for i in clean_data.columns if i not in discard]
-x_train,x_val,x_test,y_train,y_val,y_test = train_test_split(features)
+
+
 
