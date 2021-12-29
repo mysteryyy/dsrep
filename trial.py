@@ -228,7 +228,7 @@ def split_by_activities(data):
 
 def split_by_activities(data):
     main = ["lying", "sitting", "standing", "walking", "running", "cycling"]
-    others = [i for i in data.activity_name.unqiue() if i not in main]
+    others = [i for i in data.activity_name.unique() if i not in main]
     sit_stand = ["sitting", "standing"]
     if activity in main:
         if activity in sit_stand:
@@ -639,10 +639,11 @@ def sliding_window_feats(data, feats, win_len, step):
     return final_data
 
 
-class split_data:
+class modelling:
     def __init__(
         self,
         clean_data,
+        features,
         train_subjects=[101, 103, 104, 105],
         val_subjects=[102, 106],
         test_subjects=[107, 108],
@@ -652,32 +653,101 @@ class split_data:
         self.train_subjects = train_subjects
         self.val_subjects = val_subjects
         self.test_subjects = test_subjects
+        self.features = features
 
-    def train_test_split_acttype(self, features):
+    def train_test_split_acttype(self):
         le = preprocessing.LabelEncoder()
         train = self.clean_data[self.clean_data.id.isin(self.train_subjects)]
         val = self.clean_data[self.clean_data.id.isin(self.val_subjects)]
         test = self.clean_data[self.clean_data.id.isin(self.test_subjects)]
-        x_train = train[features]
-        x_val = val[features]
-        x_test = test[features]
+        x_train = train[self.features]
+        x_val = val[self.features]
+        x_test = test[self.features]
         y_train = le.fit_transform(train.activity_type)
         y_val = le.fit_transform(val.activity_type)
         y_test = le.fit_transform(test.activity_type)
         return x_train, x_val, x_test, y_train, y_val, y_test
 
-    def train_test_split_actname(self, features):
+    def train_test_split_actname(self):
         le = preprocessing.LabelEncoder()
         train = self.clean_data[self.clean_data.id.isin(self.train_subjects)]
         val = self.clean_data[self.clean_data.id.isin(self.val_subjects)]
         test = self.clean_data[self.clean_data.id.isin(self.test_subjects)]
-        x_train = train[features]
-        x_val = val[features]
-        x_test = test[features]
+        x_train = train[self.features]
+        x_val = val[self.features]
+        x_test = test[self.features]
         y_train = le.fit_transform(train.activity_name)
         y_val = le.fit_transform(val.activity_name)
         y_test = le.fit_transform(test.activity_name)
         return x_train, x_val, x_test, y_train, y_val, y_test
+
+    def validate_models(self, model_type, class_type):
+        clean_data_feats = self.clean_data
+        if class_type == "intensity":
+            (
+                x_train,
+                x_val,
+                x_test,
+                y_train,
+                y_val,
+                y_test,
+            ) = self.train_test_split_acttype()
+        else:
+            (
+                x_train,
+                x_val,
+                x_test,
+                y_train,
+                y_val,
+                y_test,
+            ) = self.train_test_split_actname()
+        pca = PCA(
+            n_components=0.99
+        )  # PCA object that retains only those eigenvalues that explain 99% of the variance
+        bic = []
+        mle = []
+        accuracy = []
+        l = []
+        if model_type == "Logistic":
+            df_lr = pd.DataFrame(columns=["MLE", "Validation_Accuracy", "Lambda"])
+            x_train = pca.fit_transform(x_train)
+            x_val = pca.transform(x_val)
+            x_test = pca.transform(x_test)
+            for lam in range(1, 10):
+                # Initializing logistic Regression with specific lambda
+                model = LogisticRegression(random_state=0, solver="saga", C=1 / lam)
+                scores = model_scores(model, x_train, y_train, x_val, y_val)
+                mle.append(scores[0])
+                accuracy.append(scores[1])
+                bic.append(scores[2])
+                l.append(lam)
+
+            df_lr["MLE"] = mle
+            df_lr["Validation Accuracy"] = accuracy
+            df_lr["Lambda"] = l
+            df_lr["bic"] = bic
+            return df_lr
+        elif model_type == "Random_Forest":
+            df_rf = pd.DataFrame(columns=["MLE", "Validation_Accuracy", "Lambda"])
+            for min_samp in range(5, 100, 5):
+                for max_depth in range(5, 100, 5):
+                    # Initializing random forest
+                    rf = RandomForestClassifier(
+                        random_state=0, max_depth=max_depth, min_samples_split=min_samp
+                    )
+                    # Calculating Scores
+                    scores = model_scores(rf, x_train, y_train, x_val, y_val)
+                    # Appending scores to respective lists
+                    mle.append(scores[0])
+                    accuracy.append(scores[1])
+                    bic.append(scores[2])
+                    l.append(lam)
+
+            df_rf["MLE"] = mle
+            df_rf["Validation_Accuracy"] = accuracy
+            df_rf["Lambda"] = l
+            df_rf["bic"] = bic
+            return df_rf
 
 
 # **Warning**: This cell takes a very long time to run.It is advised to use a debugger to run
@@ -700,64 +770,9 @@ def model_scores(model, x_train, y_train, x_val, y_val):
     k = x_train.shape[1]
     model.fit(x_train, y_train)
     mle = log_loss(y_train, model.predict_proba(x_train))
-    accuracy = accuracy_score(y_val, model.predict(x_train))
+    accuracy = accuracy_score(y_val, model.predict(x_val))
     bic = k * np.log(n) - 2 * mle
     return mle, accuracy, bic
-
-
-def validate_models(clean_data_feats, model_type, class_type):
-    split = split_data(clean_data_feats)
-    if class_type == "intensity":
-        x_train, x_val, x_test, y_train, y_val, y_test = split.train_test_split_acttype(
-            features
-        )
-    else:
-        x_train, x_val, x_test, y_train, y_val, y_test = split.train_test_split_actname(
-            features
-        )
-    pca = PCA(
-        n_components=0.99
-    )  # PCA object that retains only those eigenvalues that explain 99% of the variance
-    bic = []
-    mle = []
-    accuracy = []
-    l = []
-    if model_type == "Logistic":
-        df_lr = pd.DataFrame(columns=["MLE", "Validation_Accuracy", "Lambda"])
-        x_train = pca.fit_transform(x_train)
-        x_val = pca.transform(x_val)
-        x_test = pca.transform(x_test)
-        for lam in range(1, 10):
-            # Initializing logistic Regression with specific lambda
-            model = LogisticRegression(random_state=0, solver="saga", C=1 / lam)
-            scores = model_scores(model, x_train, y_train, x_val, y_val)
-            mle.append(scores[0])
-            accuracy.append(scores[1])
-            bic.append(scores[2])
-
-        df_lr["MLE"] = mle
-        df_lr["Validation Accuracy"] = accuracy
-        df_lr["Lambda"] = l
-        return df_lr
-    elif model_type == "Random_Forest":
-        df_rf = pd.DataFrame(columns=["MLE", "Validation_Accuracy", "Lambda"])
-        for min_samp in range(5, 100, 5):
-            for max_depth in range(5, 100, 5):
-                # Initializing random forest
-                rf = RandomForestClassifier(
-                    random_state=0, max_depth=max_depth, min_samples_split=min_samp
-                )
-                # Calculating Scores
-                scores = model_scores(rf, x_train, y_train, x_val, y_val)
-                # Appending scores to respective lists
-                mle.append(scores[0])
-                accuracy.append(scores[1])
-                bic.append(scores[2])
-
-        df_rf["MLE"] = mle
-        df_rf["Validation Accuracy"] = accuracy
-        df_rf["Lambda"] = l
-        return df_rf
 
 
 # **Remember to uncomment line below**
@@ -766,23 +781,6 @@ def validate_models(clean_data_feats, model_type, class_type):
 
 clean_data_feats = pd.read_pickle("activity_short_data.pkl")
 features = [i for i in clean_data_feats.columns if i not in discard]
-split = split_data(clean_data_feats)
-x_train, x_val, x_test, y_train, y_val, y_test = split.train_test_split_actname(
-    features
-)
-rf = RandomForestClassifier(min_samples_split=6, max_depth=130, random_state=0)
-rf.fit(x_train, y_train)
-print(" Type accuracy: ")
-print(accuracy_score(rf.predict(x_val), y_val))
-print("Type Log loss random Forest:")
-print(log_loss(y_train, rf.predict_proba(x_train)))
-
-x_train, x_val, x_test, y_train, y_val, y_test = train_test_split_acttype(
-    clean_data_feats, features
-)
-rf1 = RandomForestClassifier(min_samples_split=6, max_depth=130, random_state=0)
-rf1.fit(x_train, y_train)
-print(" Type accuracy: ")
-print(accuracy_score(rf1.predict(x_val), y_val))
-print("Type Log loss random Forest:")
-print(log_loss(y_train, rf1.predict_proba(x_train)))
+modelling = modelling(clean_data_feats, features)
+df_lr = modelling.validate_models("Random_Forest", "normal")
+print(df_lr)
